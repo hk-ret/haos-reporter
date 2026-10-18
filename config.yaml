@@ -1,0 +1,29 @@
+name: "Pi Reporter"
+slug: "pi_reporter"
+version: "1.0.0"
+description: "Report HAOS-Systemdata over MQTT"
+startup: application
+boot: auto
+init: false
+host_network: true
+host_uts: true
+homeassistant_api: true
+arch:
+  - aarch64
+  # - armv7
+
+options:
+  mqtt_host: "infinexus"
+  mqtt_user: "mqtt_user"
+  mqtt_pw: ""
+  report_interval: 3
+  info_topic: "pi-monitor/sensor/"
+  discovery_topic: "homeassistant/sensor/@-reporter/monitor/config"
+
+schema:
+  mqtt_host: str
+  mqtt_user: str
+  mqtt_pw: password
+  report_interval: int(1,60)
+  info_topic: str
+  discovery_topic: str
