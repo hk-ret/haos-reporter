@@ -22,6 +22,7 @@ def detect_environment():
 
 
 ENVIRONMENT = detect_environment()
+print(f"Starting PI-REPORTER in {ENVIRONMENT} environment")
 
 
 def get_config():
