@@ -451,7 +451,13 @@ def info_values():
     if ENVIRONMENT == "haos":
         info["reporter"] = "Pi Reporter 1.0.0 (HAOS)"
     else:
-        info["reporter"] = "".join([config["app"], " v:", config["version"]])
+        info["reporter"] = "".join(
+            [
+                config.get("app", "Pi Reporter (Docker)"),
+                " v:",
+                config.get("version", "?.?.?"),
+            ]
+        )
     info["timestamp"] = datetime.now().astimezone().isoformat()
     info["report_interval"] = config["report_interval"]
     info["host_name"], info["fqdn"] = get_hostnames()
