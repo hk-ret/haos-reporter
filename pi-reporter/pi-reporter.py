@@ -1,11 +1,13 @@
 #! /usr/bin/env python3
 """Gather information about a Rspberry or Orange Pi and report using MQTT"""
 
+import os
 import os.path
 import json
 import re
 import time
 import signal
+import socket
 from datetime import datetime
 
 import paho.mqtt.client as mqtt
@@ -13,14 +15,21 @@ import subprocess
 import requests
 
 
+def detect_environment():
+    if os.environ.get("SUPERVISOR_TOKEN"):
+        return "haos"
+    return "docker"
+
+
+ENVIRONMENT = detect_environment()
+
+
 def get_config():
     "read configuration file"
-    try:
-        with open("options.json") as cfg_file:
-            return json.load(cfg_file)
-    except:
-        with open("/data/options.json") as cfg_file:
-            return json.load(cfg_file)
+    with open(
+        "/data/options.json" if ENVIRONMENT == "haos" else "options.json"
+    ) as cfg_file:
+        return json.load(cfg_file)
 
 
 def on_connect(client, userdata, flags, rc):
@@ -39,13 +48,34 @@ def _get_info(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 def get_hostnames():
     "determine hostname of the Pi"
+    if ENVIRONMENT == "haos":
+        host = socket.gethostname()
+        return host, host
     fqdn = _get_info("cat hostname-f.txt").strip()
     host = fqdn.split(".")[0]
     return host, fqdn
 
 
+def get_model_haos():
+    try:
+        with open("/device-tree/model", "rb") as f:
+            model = f.read().decode(errors="replace").strip("\x00\n ")
+    except OSError:
+        model = "unknown"
+
+    conn = "?"
+    if "Pi 4 Model B" in model or "Pi 3 Model B" in model:
+        conn = "e,w,b"
+    elif "Pi 5" in model:
+        conn = "e,w,b"
+
+    return model, conn
+
+
 def get_model():
     "determine the model of the Pi"
+    if ENVIRONMENT == "haos":
+        return get_model_haos()
     model = (
         _get_info("cat proc.device-tree.model.txt")  # /proc/device-tree/model
         # .replace("Raspberry Pi", "RPi")
@@ -88,6 +118,113 @@ def get_homeassistant_version():
     except Exception as exc:
         print(f"HA version unavailable: {exc}")
         return "unknown"
+
+
+# def get_ha_sensors(entity_ids):
+#     """Read selected Home Assistant entities."""
+#     token = os.environ.get("SUPERVISOR_TOKEN")
+#     if not token:
+#         return {}
+
+#     try:
+#         response = requests.get(
+#             "http://supervisor/core/api/states",
+#             headers={"Authorization": f"Bearer {token}"},
+#             timeout=5,
+#         )
+#         response.raise_for_status()
+
+#         states = {item["entity_id"]: item for item in response.json()}
+
+#         result = {}
+#         for entity_id in entity_ids:
+#             item = states.get(entity_id)
+#             if item and item["state"] not in ("unknown", "unavailable"):
+#                 result[entity_id] = {
+#                     "state": item["state"],
+#                     "attributes": item.get("attributes", {}),
+#                 }
+
+#         return result
+
+#     except requests.RequestException as exc:
+#         print(f"HA sensor query failed: {exc}")
+#         return {}
+
+
+def get_ha_data():
+    """Read Home Assistant System Monitor sensors and HAOS update status."""
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return {}
+
+    entity_ids = {
+        "memory_usage_percent": "sensor.system_monitor_arbeitsspeicherauslastung",
+        "memory_used": "sensor.system_monitor_belegter_arbeitsspeicher",
+        "memory_free": "sensor.system_monitor_freier_arbeitsspeicher",
+        "disk_usage_percent": "sensor.system_monitor_massenspeicher_auslastung",
+        "disk_used": "sensor.system_monitor_belegter_massenspeicher",
+        "disk_free": "sensor.system_monitor_freier_massenspeicher",
+        "network_out": "sensor.system_monitor_netzwerkausgang_enu1u1u1",
+        "network_in": "sensor.system_monitor_netzwerkeingang_enu1u1u1",
+        "cpu_usage_percent": "sensor.system_monitor_prozessornutzung",
+        "cpu_temperature": "sensor.system_monitor_prozessortemperatur",
+        "swap_usage_percent": "sensor.system_monitor_swap_auslastung",
+        "cpu_pressure_10s": "sensor.system_monitor_teilweiser_cpu_engpass_10_s_durchschnitt",
+        "cpu_pressure_60s": "sensor.system_monitor_teilweiser_cpu_engpass_60_s_durchschnitt",
+        "cpu_pressure_300s": "sensor.system_monitor_teilweiser_cpu_engpass_300_s_durchschnitt",
+        "cpu_pressure_total": "sensor.system_monitor_teilweiser_cpu_engpass_gesamt",
+        "load_1min": "sensor.system_monitor_last_1_min",
+        "load_5min": "sensor.system_monitor_last_5_min",
+        "load_15min": "sensor.system_monitor_last_15_min",
+        "last_boot": "sensor.system_monitor_betriebszeit",
+    }
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        response = requests.get(
+            "http://supervisor/core/api/states",
+            headers=headers,
+            timeout=10,
+        )
+        response.raise_for_status()
+        states = {item["entity_id"]: item for item in response.json()}
+    except (requests.RequestException, ValueError) as exc:
+        print(f"HA sensor query failed: {exc}")
+        return {}
+
+    result = {}
+
+    for name, entity_id in entity_ids.items():
+        item = states.get(entity_id)
+        if not item:
+            continue
+
+        state = item.get("state")
+        if state in ("unknown", "unavailable", None):
+            continue
+
+        attrs = item.get("attributes", {})
+        result[name] = {
+            "state": state,
+            "unit": attrs.get("unit_of_measurement"),
+        }
+
+    # HAOS update information
+    update = states.get("update.home_assistant_operating_system_update")
+
+    if update:
+        attrs = update.get("attributes", {})
+        result["haos_update"] = {
+            "state": update.get("state"),
+            "installed_version": attrs.get("installed_version"),
+            "latest_version": attrs.get("latest_version"),
+            "in_progress": attrs.get("in_progress"),
+            "release_url": attrs.get("release_url"),
+        }
+
+    return result
 
 
 def get_drives(root=False):
@@ -310,10 +447,14 @@ def get_networking_details():
 # {"info": {"timestamp": "2023-03-08T09:04:42+01:00", "rpi_model": "Xunlong Orange Pi Zero", "ifaces": "e,w,b", "host_name": "aries", "fqdn": "aries", "ux_release": "bullseye\nbullseye-backports\nbullseye-security\nbullseye-updates", "ux_version": "5.15.80-sunxi", "up_time": "19 days,  16:08", "last_update": "2023-01-19T14:34:15+01:00", "fs_total_gb": 32, "fs_free_prcnt": 8, "networking": {"eth0": {"IP": "192.168.1.236", "mac": "02:81:43:f6:a6:a8"}, "wlan0": {"mac": "36:1a:af:5c:0a:8a"}}, "drives": {"dev": {"size_gb": 0, "used_prcnt": 0, "device": "udev", "mount_pt": "/dev"}, "root": {"size_gb": 32, "used_prcnt": 8, "device": "/dev/mmcblk0p1", "mount_pt": "/"}, "var-log": {"size_gb": 0, "used_prcnt": 71, "device": "/dev/zram1", "mount_pt": "/var/log"}}, "memory": {"size_mb": "491.680", "free_mb": "307.895"}, "cpu": {"hardware": "Allwinner sun8i Family", "model": "ARMv7 Processor rev 5 (v7l)", "number_cores": 4, "bogo_mips": "192.00", "serial": "02c0008143f6a6a8", "load_1min_prcnt": 0.0, "load_5min_prcnt": 0.0, "load_15min_prcnt": 0.0}, "throttle": ["Not Available"], "temperature_c": -1.0, "temp_gpu_c": -1.0, "temp_cpu_c": -1.0, "reporter": "ISP-RPi-mqtt-daemon v1.6.0", "report_interval": 5}}
 def info_values():
     info = {}
-    info["reporter"] = "".join([config["app"], " v:", config["version"]])
+    if ENVIRONMENT == "haos":
+        info["reporter"] = "Pi Reporter 1.0.0 (HAOS)"
+    else:
+        info["reporter"] = "".join([config["app"], " v:", config["version"]])
     info["timestamp"] = datetime.now().astimezone().isoformat()
     info["report_interval"] = config["report_interval"]
     info["host_name"], info["fqdn"] = get_hostnames()
+    info["environment"] = ENVIRONMENT
     info["model"], info["ifaces"] = get_model()
     # info["rpi_model"] = info["model"]
     info["ux_release"], info["ux_version"] = get_linux_version()
@@ -332,11 +473,16 @@ def update_values():
         root=True
     )
     info["temp_cpu_c"], info["temp_gpu_c"], info["temperature_c"] = get_temp()
-    # info["last_update"] = get_last_apt_update()
-    info["ha_version"] = (
-        get_homeassistant_version()
-    )  # info["networking"] = get_networking_details()
+    if ENVIRONMENT == "haos":
+        info["ha_version"] = get_homeassistant_version()
+    else:
+        info["last_update"] = get_last_apt_update()
+    # info["networking"] = get_networking_details()
     info["timestamp"] = datetime.now().astimezone().isoformat()
+
+    if ENVIRONMENT == "haos":
+        info["ha_sensors"] = get_ha_data()
+
     return info
 
 

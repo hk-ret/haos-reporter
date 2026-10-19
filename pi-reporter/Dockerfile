@@ -1,9 +1,10 @@
 FROM python:3-slim
 
 ARG BUILD_ARCH
+ARG BUILD_VERSION=1.0.0
 
 LABEL io.hass.type="app" \
-    io.hass.version="1.0.0" \
+    io.hass.version="${BUILD_VERSION}" \
     io.hass.arch="${BUILD_ARCH}"
 
 WORKDIR /pi-reporter

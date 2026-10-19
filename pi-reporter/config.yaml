@@ -1,16 +1,20 @@
 name: "Pi Reporter"
 slug: "pi_reporter"
 version: "1.0.0"
-description: "Report HAOS-Systemdata over MQTT"
+description: "Report HAOS system data over MQTT"
+
 startup: application
 boot: auto
 init: false
+
 host_network: true
 host_uts: true
+devicetree: true
 homeassistant_api: true
+
 arch:
   - aarch64
-  # - armv7
+  - armv7
 
 options:
   mqtt_host: "infinexus"
@@ -24,6 +28,6 @@ schema:
   mqtt_host: str
   mqtt_user: str
   mqtt_pw: password
-  report_interval: int(1,60)
+  report_interval: "int(1,60)"
   info_topic: str
   discovery_topic: str
