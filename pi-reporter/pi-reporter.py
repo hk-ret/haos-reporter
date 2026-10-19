@@ -15,8 +15,12 @@ import requests
 
 def get_config():
     "read configuration file"
-    with open("/data/options.json") as cfg_file:
-        return json.load(cfg_file)
+    try:
+        with open("options.json") as cfg_file:
+            return json.load(cfg_file)
+    except:
+        with open("/data/options.json") as cfg_file:
+            return json.load(cfg_file)
 
 
 def on_connect(client, userdata, flags, rc):
