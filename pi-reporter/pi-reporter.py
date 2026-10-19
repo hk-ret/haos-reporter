@@ -313,6 +313,36 @@ def _get_bytes(text="", unit=None):
         return value
 
 
+def apply_ha_memory(ha_data):
+    """Replace container memory metrics with HA host sensor values."""
+    mem = {}
+    mem["size_mb"] = 0
+    mem["free_mb"] = 0
+    mem["available_mb"] = 0
+    mem["size_swap"] = 0
+    mem["free_swap"] = 0
+    used = ha_data.get("memory_used", {}).get("state")
+    free = ha_data.get("memory_free", {}).get("state")
+    percent = ha_data.get("memory_usage_percent", {}).get("state")
+
+    try:
+        if used is not None and free is not None:
+            used_mib = float(used)
+            free_mib = float(free)
+
+            # HA sensors report MiB; existing fields use decimal MB.
+            mem["size_mb"] = round((used_mib + free_mib) * 1.048576)
+            mem["free_mb"] = round(free_mib * 1.048576)
+
+        if percent is not None:
+            mem["mem_used_prcnt"] = round(float(percent))
+
+    except (TypeError, ValueError):
+        print("Could not convert HA memory sensor values")
+
+    return mem
+
+
 def get_memory_info():
     "get memory usage info"
     mem = {}
@@ -472,9 +502,15 @@ def info_values():
 
 def update_values():
     "gather all information"
+    if ENVIRONMENT == "haos":
+        ha_data = get_ha_data()
     info = {}
     info["cpu"] = get_cpu_info()
-    info["memory"] = get_memory_info()
+    info["memory"] = (
+        apply_ha_memory(info["memory"], ha_data)
+        if ENVIRONMENT == "haos"
+        else get_memory_info()
+    )
     info["up_time"], info["up_time_secs"] = get_uptime()
     info["fs_total_gb"], info["fs_used_prcnt"], info["fs_free_prcnt"] = get_drives(
         root=True
@@ -482,13 +518,11 @@ def update_values():
     info["temp_cpu_c"], info["temp_gpu_c"], info["temperature_c"] = get_temp()
     if ENVIRONMENT == "haos":
         info["ha_version"] = get_homeassistant_version()
+        info["ha_sensors"] = ha_data
     else:
         info["last_update"] = get_last_apt_update()
     # info["networking"] = get_networking_details()
     info["timestamp"] = datetime.now().astimezone().isoformat()
-
-    if ENVIRONMENT == "haos":
-        info["ha_sensors"] = get_ha_data()
 
     return info
 

@@ -1,6 +1,6 @@
 name: "Pi Reporter"
 slug: "pi_reporter"
-version: "1.0.1"
+version: "1.0.2"
 description: "Report HAOS system data over MQTT"
 
 startup: application
@@ -17,7 +17,7 @@ arch:
   - armv7
 
 options:
-  mqtt_host: "infinexus"
+  mqtt_host: "infinexus.fritz.box"
   mqtt_user: "mqtt_user"
   mqtt_pw: ""
   report_interval: 3
