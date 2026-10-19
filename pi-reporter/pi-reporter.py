@@ -507,9 +507,7 @@ def update_values():
     info = {}
     info["cpu"] = get_cpu_info()
     info["memory"] = (
-        apply_ha_memory(info["memory"], ha_data)
-        if ENVIRONMENT == "haos"
-        else get_memory_info()
+        apply_ha_memory(ha_data) if ENVIRONMENT == "haos" else get_memory_info()
     )
     info["up_time"], info["up_time_secs"] = get_uptime()
     info["fs_total_gb"], info["fs_used_prcnt"], info["fs_free_prcnt"] = get_drives(
