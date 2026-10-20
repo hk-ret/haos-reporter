@@ -250,6 +250,33 @@ def get_ha_data():
     return result
 
 
+def get_ha_fs(ha_data, root=False):
+    disk_percent = ha_data.get("disk_usage_percent", {}).get("state")
+    disk_used = ha_data.get("disk_used", {}).get("state")
+    disk_free = ha_data.get("disk_free", {}).get("state")
+
+    if disk_percent is not None:
+        fs_used_prcnt = round(float(disk_percent))
+        fs_free_prcnt = 100 - fs_used_prcnt
+    else:
+        fs_used_prcnt = None
+        fs_free_prcnt = None
+
+    if disk_used is not None and disk_free is not None:
+        fs_total_gb = round(float(disk_used) + float(disk_free))
+    else:
+        fs_total_gb = None
+    if root:
+        return fs_total_gb, fs_used_prcnt, fs_free_prcnt
+
+    return {
+        "size_gb": fs_total_gb,
+        "used_prcnt": fs_used_prcnt,
+        "device": "root",
+        "mount_pt": "/",
+    }
+
+
 def get_drives(root=False):
     "gather info on filesystems"
     fsys = {}
@@ -552,7 +579,7 @@ def info_values(ha_data):
     info["ux_release"], info["ux_version"] = (
         get_ha_version(ha_data) if ENVIRONMENT == "haos" else get_linux_version()
     )
-    info["drives"] = get_drives()
+    info["drives"] = get_ha_fs(ha_data) if ENVIRONMENT == "haos" else get_drives()
     info["networking"] = get_networking_details()
     return info
 
@@ -568,8 +595,10 @@ def update_values(ha_data):
     if info["up_time"] == "?" and info["up_time_secs"] is not None:
         info["up_time"] = format_uptime(info["up_time_secs"])
 
-    info["fs_total_gb"], info["fs_used_prcnt"], info["fs_free_prcnt"] = get_drives(
-        root=True
+    info["fs_total_gb"], info["fs_used_prcnt"], info["fs_free_prcnt"] = (
+        get_ha_fs(ha_data, root=True)
+        if ENVIRONMENT == "haos"
+        else get_drives(root=True)
     )
     info["temp_cpu_c"], info["temp_gpu_c"], info["temperature_c"] = (
         get_ha_temp(ha_data) if ENVIRONMENT == "haos" else get_temp()
