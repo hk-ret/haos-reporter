@@ -205,7 +205,7 @@ def get_ha_data():
         print(f"HA sensor query failed: {exc}")
         return {}
 
-    result = {}
+    result = {"ENVIRONMENT": ENVIRONMENT}
 
     for name, entity_id in entity_ids.items():
         item = states.get(entity_id)
@@ -560,7 +560,7 @@ def get_networking_details():
 def info_values(ha_data):
     info = {}
     if ENVIRONMENT == "haos":
-        version = os.environ.get("version", "whatever")
+        version = os.environ.get("PiRepVersion", "whatever")
         info["reporter"] = f"Pi Reporter v{version} (HAOS)"
     else:
         info["reporter"] = "".join(
