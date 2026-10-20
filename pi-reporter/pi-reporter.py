@@ -530,7 +530,7 @@ def get_networking_details():
 
 
 # {"info": {"timestamp": "2023-03-08T09:04:42+01:00", "rpi_model": "Xunlong Orange Pi Zero", "ifaces": "e,w,b", "host_name": "aries", "fqdn": "aries", "ux_release": "bullseye\nbullseye-backports\nbullseye-security\nbullseye-updates", "ux_version": "5.15.80-sunxi", "up_time": "19 days,  16:08", "last_update": "2023-01-19T14:34:15+01:00", "fs_total_gb": 32, "fs_free_prcnt": 8, "networking": {"eth0": {"IP": "192.168.1.236", "mac": "02:81:43:f6:a6:a8"}, "wlan0": {"mac": "36:1a:af:5c:0a:8a"}}, "drives": {"dev": {"size_gb": 0, "used_prcnt": 0, "device": "udev", "mount_pt": "/dev"}, "root": {"size_gb": 32, "used_prcnt": 8, "device": "/dev/mmcblk0p1", "mount_pt": "/"}, "var-log": {"size_gb": 0, "used_prcnt": 71, "device": "/dev/zram1", "mount_pt": "/var/log"}}, "memory": {"size_mb": "491.680", "free_mb": "307.895"}, "cpu": {"hardware": "Allwinner sun8i Family", "model": "ARMv7 Processor rev 5 (v7l)", "number_cores": 4, "bogo_mips": "192.00", "serial": "02c0008143f6a6a8", "load_1min_prcnt": 0.0, "load_5min_prcnt": 0.0, "load_15min_prcnt": 0.0}, "throttle": ["Not Available"], "temperature_c": -1.0, "temp_gpu_c": -1.0, "temp_cpu_c": -1.0, "reporter": "ISP-RPi-mqtt-daemon v1.6.0", "report_interval": 5}}
-def info_values():
+def info_values(ha_data):
     info = {}
     if ENVIRONMENT == "haos":
         version = config.get("version", "whatever")
@@ -557,10 +557,8 @@ def info_values():
     return info
 
 
-def update_values():
+def update_values(ha_data):
     "gather all information"
-    if ENVIRONMENT == "haos":
-        ha_data = get_ha_data()
     info = {}
     info["cpu"] = get_cpu_info()
     info["memory"] = (
@@ -612,7 +610,7 @@ def mqtt_publish(client: mqtt.Client, topic, payload, qos=0, retain=False):
 
 
 def report_loop(info, mqtt_client, base_topic):
-    info.update(update_values())
+    info.update(update_values(ha_data))
     # print(f"info = {json.dumps( {'info': info},indent=2)}")
     mqtt_publish(
         mqtt_client, topic=base_topic + "/monitor", payload=json.dumps({"info": info})
@@ -640,7 +638,10 @@ mqtt_client.on_connect = on_connect
 print("Connecting")
 mqtt_client.connect(host=config["mqtt_host"])
 
-info = info_values()
+
+ha_data = get_ha_data() if ENVIRONMENT == "haos" else None
+
+info = info_values(ha_data)
 base_topic = config["info_topic"] + info["host_name"]
 detection_config = detection_config(host_name=info["host_name"], topic=base_topic)
 # print(f"detection_config = {json.dumps( detection_config,indent=2)}")
