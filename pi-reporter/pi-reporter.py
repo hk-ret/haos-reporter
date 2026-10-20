@@ -533,8 +533,8 @@ def get_networking_details():
 def info_values(ha_data):
     info = {}
     if ENVIRONMENT == "haos":
-        version = config.get("version", "whatever")
-        info["reporter"] = f"Pi Reporter {version} (HAOS)"
+        version = os.environ.get("version", "whatever")
+        info["reporter"] = f"Pi Reporter v{version} (HAOS)"
     else:
         info["reporter"] = "".join(
             [
