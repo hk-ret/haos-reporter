@@ -100,6 +100,13 @@ def get_model():
     return model, conn
 
 
+def get_ha_version(ha_data):
+    "determine version of Home Assistant OS"
+    ha = ha_data.get("ha_update", {}).get("installed_version", "unknown")
+    haos = ha_data.get("haos_update", {}).get("installed_version", "unknown")
+    return ha, haos
+
+
 def get_linux_version():
     "determine version of installed Linux"
     lnx = _get_info("grep VERSION_CODENAME /etc/os-release").split("=")[1].strip()
@@ -165,6 +172,7 @@ def get_ha_data():
         "memory_free": "sensor.system_monitor_freier_arbeitsspeicher",
         "swap_used": "sensor.system_monitor_belegter_swap",
         "swap_free": "sensor.system_monitor_freier_swap",
+        "cpu_temperature": "sensor.system_monitor_prozessortemperatur",
         #
         "swap_usage_percent": "sensor.system_monitor_swap_auslastung",
         "disk_usage_percent": "sensor.system_monitor_massenspeicher_auslastung",
@@ -173,7 +181,6 @@ def get_ha_data():
         "network_out": "sensor.system_monitor_netzwerkausgang_enu1u1u1",
         "network_in": "sensor.system_monitor_netzwerkeingang_enu1u1u1",
         "cpu_usage_percent": "sensor.system_monitor_prozessornutzung",
-        "cpu_temperature": "sensor.system_monitor_prozessortemperatur",
         "cpu_pressure_10s": "sensor.system_monitor_teilweiser_cpu_engpass_10_s_durchschnitt",
         "cpu_pressure_60s": "sensor.system_monitor_teilweiser_cpu_engpass_60_s_durchschnitt",
         "cpu_pressure_300s": "sensor.system_monitor_teilweiser_cpu_engpass_300_s_durchschnitt",
@@ -215,6 +222,18 @@ def get_ha_data():
             "unit": attrs.get("unit_of_measurement"),
         }
 
+    # HA update information
+    update = states.get("update.home_assistant_core_update")
+
+    if update:
+        attrs = update.get("attributes", {})
+        result["ha_update"] = {
+            "state": update.get("state"),
+            "installed_version": attrs.get("installed_version"),
+            "latest_version": attrs.get("latest_version"),
+            "in_progress": attrs.get("in_progress"),
+            "release_url": attrs.get("release_url"),
+        }
     # HAOS update information
     update = states.get("update.home_assistant_operating_system_update")
 
@@ -321,7 +340,7 @@ def apply_ha_memory(ha_data):
     mem = {}
     mem["size_mb"] = 0
     mem["free_mb"] = 0
-    mem["available_mb"] = 0
+    # mem["available_mb"] = 0
     mem["size_swap"] = 0
     mem["free_swap"] = 0
     used = ha_data.get("memory_used", {}).get("state")
@@ -406,7 +425,7 @@ def format_uptime(seconds):
         parts.append(f"{minutes}m")
     parts.append(f"{secs}s")
 
-    return " ".join(parts)
+    return ":".join(parts)
 
 
 def get_uptime():
@@ -424,6 +443,12 @@ def get_uptime():
         uptime = "?"
     up_secs = int(_get_info("cut -f1 -d. /proc/uptime"))
     return uptime, up_secs
+
+
+def get_ha_temp(ha_data):
+    "determine Home Assistant OS temperature"
+    cpu_temp = ha_data.get("cpu_temp", "unknown")
+    return cpu_temp, "unknown", "unknown"
 
 
 def get_temp():
@@ -508,7 +533,8 @@ def get_networking_details():
 def info_values():
     info = {}
     if ENVIRONMENT == "haos":
-        info["reporter"] = "Pi Reporter 1.0.0 (HAOS)"
+        version = config.get("version", "whatever")
+        info["reporter"] = f"Pi Reporter {version} (HAOS)"
     else:
         info["reporter"] = "".join(
             [
@@ -523,7 +549,9 @@ def info_values():
     info["environment"] = ENVIRONMENT
     info["model"], info["ifaces"] = get_model()
     # info["rpi_model"] = info["model"]
-    info["ux_release"], info["ux_version"] = get_linux_version()
+    info["ux_release"], info["ux_version"] = (
+        get_ha_version(ha_data) if ENVIRONMENT == "haos" else get_linux_version()
+    )
     info["drives"] = get_drives()
     info["networking"] = get_networking_details()
     return info
@@ -545,7 +573,9 @@ def update_values():
     info["fs_total_gb"], info["fs_used_prcnt"], info["fs_free_prcnt"] = get_drives(
         root=True
     )
-    info["temp_cpu_c"], info["temp_gpu_c"], info["temperature_c"] = get_temp()
+    info["temp_cpu_c"], info["temp_gpu_c"], info["temperature_c"] = (
+        get_ha_temp(ha_data) if ENVIRONMENT == "haos" else get_temp()
+    )
     if ENVIRONMENT == "haos":
         info["ha_version"] = get_homeassistant_version()
         info["ha_sensors"] = ha_data

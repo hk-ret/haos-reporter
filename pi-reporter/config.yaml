@@ -1,6 +1,6 @@
 name: "Pi Reporter"
 slug: "pi_reporter"
-version: "1.0.4"
+version: "1.0.5"
 description: "Report HAOS system data over MQTT"
 
 startup: application
