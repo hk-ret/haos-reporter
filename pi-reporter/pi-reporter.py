@@ -163,6 +163,10 @@ def get_ha_data():
         "memory_usage_percent": "sensor.system_monitor_arbeitsspeicherauslastung",
         "memory_used": "sensor.system_monitor_belegter_arbeitsspeicher",
         "memory_free": "sensor.system_monitor_freier_arbeitsspeicher",
+        "swap_used": "sensor.system_monitor_belegter_swap",
+        "swap_free": "sensor.system_monitor_freier_swap",
+        #
+        "swap_usage_percent": "sensor.system_monitor_swap_auslastung",
         "disk_usage_percent": "sensor.system_monitor_massenspeicher_auslastung",
         "disk_used": "sensor.system_monitor_belegter_massenspeicher",
         "disk_free": "sensor.system_monitor_freier_massenspeicher",
@@ -170,7 +174,6 @@ def get_ha_data():
         "network_in": "sensor.system_monitor_netzwerkeingang_enu1u1u1",
         "cpu_usage_percent": "sensor.system_monitor_prozessornutzung",
         "cpu_temperature": "sensor.system_monitor_prozessortemperatur",
-        "swap_usage_percent": "sensor.system_monitor_swap_auslastung",
         "cpu_pressure_10s": "sensor.system_monitor_teilweiser_cpu_engpass_10_s_durchschnitt",
         "cpu_pressure_60s": "sensor.system_monitor_teilweiser_cpu_engpass_60_s_durchschnitt",
         "cpu_pressure_300s": "sensor.system_monitor_teilweiser_cpu_engpass_300_s_durchschnitt",
@@ -324,6 +327,8 @@ def apply_ha_memory(ha_data):
     used = ha_data.get("memory_used", {}).get("state")
     free = ha_data.get("memory_free", {}).get("state")
     percent = ha_data.get("memory_usage_percent", {}).get("state")
+    swap_used = ha_data.get("swap_used", {}).get("state")
+    swap_free = ha_data.get("swap_free", {}).get("state")
 
     try:
         if used is not None and free is not None:
@@ -336,6 +341,11 @@ def apply_ha_memory(ha_data):
 
         if percent is not None:
             mem["mem_used_prcnt"] = round(float(percent))
+        if swap_used is not None and swap_free is not None:
+            swap_used_mb = float(swap_used)
+            swap_free_mb = float(swap_free)
+            mem["size_swap"] = round((swap_used_mb + swap_free_mb) * 1.048576)
+            mem["free_swap"] = round(swap_free_mb * 1.048576)
 
     except (TypeError, ValueError):
         print("Could not convert HA memory sensor values")
@@ -378,6 +388,25 @@ def get_memory_info():
 
     # print(f"{mem=}")
     return mem
+
+
+def format_uptime(seconds):
+    """Format uptime seconds as a human-readable duration."""
+    seconds = max(0, int(seconds))
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, secs = divmod(remainder, 60)
+
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours or days:
+        parts.append(f"{hours}h")
+    if minutes or hours or days:
+        parts.append(f"{minutes}m")
+    parts.append(f"{secs}s")
+
+    return " ".join(parts)
 
 
 def get_uptime():
@@ -510,6 +539,9 @@ def update_values():
         apply_ha_memory(ha_data) if ENVIRONMENT == "haos" else get_memory_info()
     )
     info["up_time"], info["up_time_secs"] = get_uptime()
+    if info["up_time"] == "?" and info["up_time_secs"] is not None:
+        info["up_time"] = format_uptime(info["up_time_secs"])
+
     info["fs_total_gb"], info["fs_used_prcnt"], info["fs_free_prcnt"] = get_drives(
         root=True
     )
