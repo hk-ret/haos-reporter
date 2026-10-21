@@ -661,7 +661,7 @@ class GracefulKiller:
 
 config = get_config()
 # print(f"{config=}")
-mqtt_client = mqtt.Client(CallbackAPIVersion=2)
+mqtt_client = mqtt.Client(callback_api_version=2)
 mqtt_client.username_pw_set(username=config["mqtt_user"], password=config["mqtt_pw"])
 mqtt_client.on_connect = on_connect
 print("Connecting")
