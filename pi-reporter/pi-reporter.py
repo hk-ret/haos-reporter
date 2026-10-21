@@ -560,14 +560,15 @@ def get_networking_details():
 def info_values(ha_data):
     info = {}
     if ENVIRONMENT == "haos":
-        version = os.environ.get("PiRepVersion", "whatever")
-        info["reporter"] = f"Pi Reporter v{version} (HAOS)"
+        version = os.environ.get("PiRepVersion", "?.?.?")
+        info["reporter"] = f"Pi-Reporter v: {version} (HAOS)"
     else:
         info["reporter"] = "".join(
             [
-                config.get("app", "Pi Reporter (Docker)"),
+                config.get("app", "Pi-Reporter"),
                 " v:",
                 config.get("version", "?.?.?"),
+                " (Docker)",
             ]
         )
     info["timestamp"] = datetime.now().astimezone().isoformat()

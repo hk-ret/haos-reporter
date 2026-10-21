@@ -1,8 +1,8 @@
 name: "Pi Reporter"
 slug: "pi_reporter"
-version: "1.0.8"
+version: &PiRepVersion "1.0.9"
 environment: 
-  PiRepVersion: "1.0.8"
+  PiRepVersion: *PiRepVersion
 description: "Report HAOS system data over MQTT"
 
 startup: application
