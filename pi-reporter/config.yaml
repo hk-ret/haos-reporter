@@ -1,6 +1,6 @@
 name: "Pi Reporter"
 slug: "pi_reporter"
-version: &PiRepVersion "1.0.12"
+version: &PiRepVersion "1.0.13"
 environment: 
   PiRepVersion: *PiRepVersion
 description: "Report HAOS system data over MQTT"
@@ -16,7 +16,6 @@ homeassistant_api: true
 
 arch:
   - aarch64
-  - armv7
 
 options:
   mqtt_host: "infinexus.fritz.box"
