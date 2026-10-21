@@ -11,6 +11,7 @@ import socket
 from datetime import datetime
 
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import CallbackAPIVersion
 import subprocess
 import requests
 
@@ -31,11 +32,6 @@ def get_config():
         "/data/options.json" if ENVIRONMENT == "haos" else "options.json"
     ) as cfg_file:
         return json.load(cfg_file)
-
-
-def on_connect(client, userdata, flags, reason_code, properties):
-    "catch response of connection attempt"
-    print(f"PI-REPORTER connected: {reason_code=}")
 
 
 def _get_info(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT):
@@ -659,9 +655,14 @@ class GracefulKiller:
         self.kill_now = True
 
 
+def on_connect(client, userdata, flags, reason_code, properties):
+    "catch response of connection attempt"
+    print(f"PI-REPORTER connected: {reason_code=}")
+
+
 config = get_config()
 # print(f"{config=}")
-mqtt_client = mqtt.Client(callback_api_version=2)
+mqtt_client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
 mqtt_client.username_pw_set(username=config["mqtt_user"], password=config["mqtt_pw"])
 mqtt_client.on_connect = on_connect
 print("Connecting")
