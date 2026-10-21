@@ -22,7 +22,7 @@ def detect_environment():
 
 
 ENVIRONMENT = detect_environment()
-print(f"Starting PI-REPORTER in {ENVIRONMENT} environment")
+print(f"Starting PI-REPORTER in {ENVIRONMENT} environment at {datetime.now()}")
 
 
 def get_config():
@@ -33,9 +33,9 @@ def get_config():
         return json.load(cfg_file)
 
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, reason_code, properties):
     "catch response of connection attempt"
-    print(f"PI-REPORTER connected: {rc=}")
+    print(f"PI-REPORTER connected: {reason_code=}")
 
 
 def _get_info(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT):
@@ -556,7 +556,6 @@ def get_networking_details():
     return networks
 
 
-# {"info": {"timestamp": "2023-03-08T09:04:42+01:00", "rpi_model": "Xunlong Orange Pi Zero", "ifaces": "e,w,b", "host_name": "aries", "fqdn": "aries", "ux_release": "bullseye\nbullseye-backports\nbullseye-security\nbullseye-updates", "ux_version": "5.15.80-sunxi", "up_time": "19 days,  16:08", "last_update": "2023-01-19T14:34:15+01:00", "fs_total_gb": 32, "fs_free_prcnt": 8, "networking": {"eth0": {"IP": "192.168.1.236", "mac": "02:81:43:f6:a6:a8"}, "wlan0": {"mac": "36:1a:af:5c:0a:8a"}}, "drives": {"dev": {"size_gb": 0, "used_prcnt": 0, "device": "udev", "mount_pt": "/dev"}, "root": {"size_gb": 32, "used_prcnt": 8, "device": "/dev/mmcblk0p1", "mount_pt": "/"}, "var-log": {"size_gb": 0, "used_prcnt": 71, "device": "/dev/zram1", "mount_pt": "/var/log"}}, "memory": {"size_mb": "491.680", "free_mb": "307.895"}, "cpu": {"hardware": "Allwinner sun8i Family", "model": "ARMv7 Processor rev 5 (v7l)", "number_cores": 4, "bogo_mips": "192.00", "serial": "02c0008143f6a6a8", "load_1min_prcnt": 0.0, "load_5min_prcnt": 0.0, "load_15min_prcnt": 0.0}, "throttle": ["Not Available"], "temperature_c": -1.0, "temp_gpu_c": -1.0, "temp_cpu_c": -1.0, "reporter": "ISP-RPi-mqtt-daemon v1.6.0", "report_interval": 5}}
 def info_values(ha_data):
     info = {}
     if ENVIRONMENT == "haos":
@@ -662,7 +661,7 @@ class GracefulKiller:
 
 config = get_config()
 # print(f"{config=}")
-mqtt_client = mqtt.Client()
+mqtt_client = mqtt.Client(CallbackAPIVersion=2)
 mqtt_client.username_pw_set(username=config["mqtt_user"], password=config["mqtt_pw"])
 mqtt_client.on_connect = on_connect
 print("Connecting")
